@@ -32,6 +32,51 @@ const TaskManagement: React.FC = () => {
     fetchAllData();
   }, []);
 
+  const updateTruckInventoryStatus = async (task: Task, newStatus: string) => {
+    // Sadece tıra giden görevler için tır envanterini güncelle
+    if (task.taskType !== 'productionToTruck' && task.taskType !== 'warehouseToTruck') {
+      return;
+    }
+
+    try {
+      const truckRef = ref(db, `trucks/${task.toId}`);
+      const truckSnapshot = await get(truckRef);
+      
+      if (!truckSnapshot.exists()) return;
+
+      const truck = truckSnapshot.val();
+      if (!truck.inventory || !truck.inventory[task.productId]) return;
+
+      const productInventory = truck.inventory[task.productId];
+      if (!productInventory.batches) return;
+
+      // Bu göreve ait batch'i bul
+      const batchKey = Object.keys(productInventory.batches).find(key => 
+        productInventory.batches[key].taskId === task.id
+      );
+
+      if (!batchKey) return;
+
+      // Batch durumunu güncelle
+      let batchStatus = 'loaded'; // varsayılan durum
+      if (newStatus === 'teslim_alma_dogrulama') {
+        batchStatus = 'reserved';
+      } else if (newStatus === 'devam_ediyor') {
+        batchStatus = 'reserved';
+      } else if (newStatus === 'tamamlandı') {
+        batchStatus = 'loaded';
+      }
+
+      await update(ref(db, `trucks/${task.toId}/inventory/${task.productId}/batches/${batchKey}`), {
+        status: batchStatus
+      });
+
+      console.log(`Tır envanteri güncellendi: ${task.id} -> ${batchStatus}`);
+    } catch (error) {
+      console.error('Tır envanteri güncellenirken hata:', error);
+    }
+  };
+
   const fetchAllData = async () => {
     try {
       const [tasksSnapshot, productsSnapshot, usersSnapshot, productionLinesSnapshot, warehousesSnapshot, deliveryPointsSnapshot, trucksSnapshot, settingsSnapshot] = await Promise.all([
@@ -87,51 +132,6 @@ const TaskManagement: React.FC = () => {
       setFormData(prev => ({ ...prev, productionNumber: lastProductionNumber + 1 }));
     } catch (error) {
       console.error('Error fetching data:', error);
-    }
-  };
-
-  const updateTruckInventoryStatus = async (task: Task, newStatus: string) => {
-    // Sadece tıra giden görevler için tır envanterini güncelle
-    if (task.taskType !== 'productionToTruck' && task.taskType !== 'warehouseToTruck') {
-      return;
-    }
-
-    try {
-      const truckRef = ref(db, `trucks/${task.toId}`);
-      const truckSnapshot = await get(truckRef);
-      
-      if (!truckSnapshot.exists()) return;
-
-      const truck = truckSnapshot.val();
-      if (!truck.inventory || !truck.inventory[task.productId]) return;
-
-      const productInventory = truck.inventory[task.productId];
-      if (!productInventory.batches) return;
-
-      // Bu göreve ait batch'i bul
-      const batchKey = Object.keys(productInventory.batches).find(key => 
-        productInventory.batches[key].taskId === task.id
-      );
-
-      if (!batchKey) return;
-
-      // Batch durumunu güncelle
-      let batchStatus = 'loaded'; // varsayılan durum
-      if (newStatus === 'teslim_alma_dogrulama') {
-        batchStatus = 'reserved';
-      } else if (newStatus === 'devam_ediyor') {
-        batchStatus = 'reserved';
-      } else if (newStatus === 'tamamlandı') {
-        batchStatus = 'loaded';
-      }
-
-      await update(ref(db, `trucks/${task.toId}/inventory/${task.productId}/batches/${batchKey}`), {
-        status: batchStatus
-      });
-
-      console.log(`Tır envanteri güncellendi: ${task.id} -> ${batchStatus}`);
-    } catch (error) {
-      console.error('Tır envanteri güncellenirken hata:', error);
     }
   };
 
