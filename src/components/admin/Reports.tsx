@@ -8,7 +8,6 @@ import {
   Users, 
   CheckCircle, 
   Clock, 
-  Truck, 
   Calendar,
   TrendingUp,
   Activity,
